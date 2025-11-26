@@ -1,6 +1,8 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const morgan = require('morgan')
+const Phonebookentry = require('./models/phonebookentry.js')
 const cors = require('cors')
 
 app.use(cors())
@@ -12,32 +14,11 @@ morgan.token('body', request => {
 	return JSON.stringify(request.body)
 })
 
-let persons = [
-	{
-		"id": "1",
-		"name": "Arto Hellas",
-		"number": "040-123456"
-	},
-	{
-		"id": "2",
-		"name": "Ada Lovelace",
-		"number": "39-44-5323523"
-	},
-	{
-		"id": "3",
-		"name": "Dan Abramov",
-		"number": "12-43-234345"
-	},
-	{
-		"id": "4",
-		"name": "Mary Poppendieck",
-		"number": "39-23-6423122"
-	}
-]
+let persons = []
 
-const generateId = () => {
-	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
-}
+// const generateId = () => {
+// 	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)
+// }
 
 app.get('/', (request, response) => {
 	response.send('<h1>Hello World!</h1>')
@@ -50,23 +31,20 @@ app.get('/info', (request, response) => {
 })
 
 app.get('/api/persons', (request, response) => {
-	response.json(persons)
+	Phonebookentry.find({}).then((phonebookentry) => {
+		response.json(phonebookentry)
+	})
 })
 
 app.get('/api/persons/:id', (request, response) => {
-	const id = request.params.id
-	const person = persons.find(person => person.id === id)
-
-	if (person) {
-		response.json(person)
-	} else {
-		response.status(404).end()
-	}
+	Phonebookentry.findById(request.params.id).then((phonebookentry) => {
+		response.json(phonebookentry)
+	})
 })
 
 app.delete('/api/persons/:id', (request, response) => {
 	const id = request.params.id
-	persons = persons.filter(person => person.id !== id)
+	phonebookentrys = phonebookentrys.filter((phonebookentry) => phonebookentry.id !== id)
 
 	response.status(204).end()
 })
@@ -74,27 +52,18 @@ app.delete('/api/persons/:id', (request, response) => {
 app.post('/api/persons', (request, response) => {
 	const body = request.body
 
-	if (!body.name || !body.number) {
-		return response.status(400).json({
-			error: 'name and/or number missing'
-		})
+	if (!body.name) {
+		return response.status(400).json({ error: 'content missing' })
 	}
 
-	const foundPersonWithSameName = persons.filter(person => person.name === body.name).length > 0
-	if (foundPersonWithSameName) {
-		return response.status(400).json({
-			error: 'name must be unique'
-		})
-	}
-
-	const person = {
+	const phonebookentry = new Phonebookentry({
 		name: body.name,
-		number: body.number,
-		id: generateId()
-	}
+		number: body.number
+	})
 
-	persons = persons.concat(person)
-	response.json(person)
+	phonebookentry.save().then(savedPhonebookentry => {
+		response.json(savedPhonebookentry)
+	})
 })
 
 const unknownEndpoint = (request, response) => {
@@ -102,7 +71,7 @@ const unknownEndpoint = (request, response) => {
 }
 
 app.use(unknownEndpoint)
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`)
 })

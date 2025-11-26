@@ -2,7 +2,6 @@ require('dotenv').config()
 const express = require('express')
 const app = express()
 const morgan = require('morgan')
-const mongoose = require('mongoose')
 const Note = require('./models/note.js')
 
 app.use(express.json())
@@ -13,42 +12,7 @@ morgan.token('body', request => {
 	return JSON.stringify(request.body)
 })
 
-// DO NOT SAVE YOUR PASSWORD TO GITHUB!!
-const url = process.env.MONGODB_URI
-
-mongoose.set('strictQuery', false)
-mongoose.connect(url, { family: 4 })
-
-const noteSchema = new mongoose.Schema({
-	content: String,
-	important: Boolean,
-})
-
-noteSchema.set('toJSON', {
-	transform: (document, returnedObject) => {
-		returnedObject.id = returnedObject._id.toString()
-		delete returnedObject._id
-		delete returnedObject.__v
-	}
-})
-
-let notes = [
-	{
-		id: '1',
-		content: 'HTML is easy',
-		important: true,
-	},
-	{
-		id: '2',
-		content: 'Browser can execute only JavaScript',
-		important: false,
-	},
-	{
-		id: '3',
-		content: 'GET and POST are the most important methods of HTTP protocol',
-		important: true,
-	},
-]
+let notes = []
 
 app.get('/', (request, response) => {
 	response.send('<h1>Hello World!</h1>')
