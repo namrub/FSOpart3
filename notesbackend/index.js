@@ -1,7 +1,9 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const morgan = require('morgan')
 const mongoose = require('mongoose')
+const Note = require('./models/note.js')
 
 app.use(express.json())
 app.use(express.static('dist'))
@@ -12,8 +14,7 @@ morgan.token('body', request => {
 })
 
 // DO NOT SAVE YOUR PASSWORD TO GITHUB!!
-const password = process.argv[2]
-const url = `mongodb+srv://frankburman_db_user:${password}@cluster0.5ubarik.mongodb.net/noteApp?retryWrites=true&w=majority&appName=Cluster0`
+const url = process.env.MONGODB_URI
 
 mongoose.set('strictQuery', false)
 mongoose.connect(url, { family: 4 })
@@ -23,7 +24,13 @@ const noteSchema = new mongoose.Schema({
 	important: Boolean,
 })
 
-const Note = mongoose.model('Note', noteSchema)
+noteSchema.set('toJSON', {
+	transform: (document, returnedObject) => {
+		returnedObject.id = returnedObject._id.toString()
+		delete returnedObject._id
+		delete returnedObject.__v
+	}
+})
 
 let notes = [
 	{
@@ -43,52 +50,38 @@ let notes = [
 	},
 ]
 
-const generateId = () => {
-	const maxId =
-		notes.length > 0 ? Math.max(...notes.map((n) => Number(n.id))) : 0
-	return String(maxId + 1)
-}
-
 app.get('/', (request, response) => {
 	response.send('<h1>Hello World!</h1>')
 })
 
 app.get('/api/notes', (request, response) => {
-	response.json(notes)
-})
-
-app.get('/api/notes/:id', (request, response) => {
-	const id = request.params.id
-	const note = notes.find((note) => note.id === id)
-
-	if (note) {
-		response.json(note)
-	} else {
-		response.status(404).end()
-	}
-})
-
-app.get('/info', (request, response) => {
-	const currentTime = new Date
-	const phonebookEntries = persons.length
-	response.send(`<p>Phonebook has info for ${phonebookEntries} people</p> <p>${currentTime.toString()}</p>`)
-})
-
-app.get('/api/persons', (request, response) => {
-	Note.find({}).then(notes => {
+	Note.find({}).then((notes) => {
 		response.json(notes)
 	})
 })
 
-app.get('/api/persons/:id', (request, response) => {
-	const id = request.params.id
-	const person = persons.find(person => person.id === id)
+app.get('/api/notes/:id', (request, response) => {
+	Note.findById(request.params.id).then((note) => {
+		response.json(note)
+	})
+})
 
-	if (person) {
-		response.json(person)
-	} else {
-		response.status(404).end()
+
+app.post('/api/notes', (request, response) => {
+	const body = request.body
+
+	if (!body.content) {
+		return response.status(400).json({ error: 'content missing' })
 	}
+
+	const note = new Note({
+		content: body.content,
+		important: body.important || false,
+	})
+
+	note.save().then(savedNote => {
+		response.json(savedNote)
+	})
 })
 
 app.delete('/api/notes/:id', (request, response) => {
@@ -97,33 +90,12 @@ app.delete('/api/notes/:id', (request, response) => {
 
 	response.status(204).end()
 })
-
-app.post('/api/notes', (request, response) => {
-	const body = request.body
-
-	if (!body.content) {
-		return response.status(400).json({
-			error: 'content missing',
-		})
-	}
-
-	const note = {
-		content: body.content,
-		important: body.important || false,
-		id: generateId(),
-	}
-
-	notes = notes.concat(note)
-
-	response.json(note)
-})
-
 const unknownEndpoint = (request, response) => {
 	response.status(404).send({ error: 'unknown endpoint' })
 }
 
 app.use(unknownEndpoint)
-const PORT = 3001
+const PORT = process.env.PORT
 app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`)
 })
