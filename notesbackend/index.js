@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express()
 const morgan = require('morgan')
+const mongoose = require('mongoose')
 
 app.use(express.json())
 app.use(express.static('dist'))
@@ -9,6 +10,20 @@ app.use(morgan(':method :url :status :res[content-length] - :response-time ms :b
 morgan.token('body', request => {
 	return JSON.stringify(request.body)
 })
+
+// DO NOT SAVE YOUR PASSWORD TO GITHUB!!
+const password = process.argv[2]
+const url = `mongodb+srv://frankburman_db_user:${password}@cluster0.5ubarik.mongodb.net/noteApp?retryWrites=true&w=majority&appName=Cluster0`
+
+mongoose.set('strictQuery', false)
+mongoose.connect(url, { family: 4 })
+
+const noteSchema = new mongoose.Schema({
+	content: String,
+	important: Boolean,
+})
+
+const Note = mongoose.model('Note', noteSchema)
 
 let notes = [
 	{
@@ -60,7 +75,9 @@ app.get('/info', (request, response) => {
 })
 
 app.get('/api/persons', (request, response) => {
-	response.json(persons)
+	Note.find({}).then(notes => {
+		response.json(notes)
+	})
 })
 
 app.get('/api/persons/:id', (request, response) => {
