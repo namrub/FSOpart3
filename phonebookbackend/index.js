@@ -36,34 +36,71 @@ app.get('/api/persons', (request, response) => {
 	})
 })
 
-app.get('/api/persons/:id', (request, response) => {
+app.get('/api/persons/:id', (request, response, next) => {
 	Phonebookentry.findById(request.params.id).then((phonebookentry) => {
-		response.json(phonebookentry)
+		if (phonebookentry) {
+			response.json(phonebookentry)
+		} else {
+			response.status(404).end()
+		}
 	})
+		.catch(error => next(error))
 })
 
-app.delete('/api/persons/:id', (request, response) => {
-	const id = request.params.id
-	phonebookentrys = phonebookentrys.filter((phonebookentry) => phonebookentry.id !== id)
-
-	response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+	Phonebookentry.findByIdAndDelete(request.params.id)
+		.then(result => {
+			response.status(204).end()
+		})
+		.catch(error => next(error))
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', (request, response, next) => {
 	const body = request.body
 
 	if (!body.name) {
 		return response.status(400).json({ error: 'content missing' })
 	}
 
-	const phonebookentry = new Phonebookentry({
-		name: body.name,
-		number: body.number
+	const phonebookentryExists = Phonebookentry.findOne({ name: body.name }).then(phonebookentryExists => {
+		if (phonebookentryExists) {
+			//put
+			phonebookentryExists.number = body.number
+			return phonebookentryExists.save().then(phonebookentryUpdated => {
+				response.json(phonebookentryUpdated)
+			})
+				.catch(error => next(error))
+		} else {
+			//post
+			const phonebookentry = new Phonebookentry({
+				name: body.name,
+				number: body.number
+			})
+			return phonebookentry.save().then(savedPhonebookentry => {
+				response.json(savedPhonebookentry)
+			})
+				.catch(error => next(error))
+		}
 	})
+})
 
-	phonebookentry.save().then(savedPhonebookentry => {
-		response.json(savedPhonebookentry)
-	})
+app.put('/api/persons/:id', (request, response, next) => {
+	const { name, number } = request.body
+
+	Phonebookentry.findById(request.params.id)
+		.then(phonebookentry => {
+			if (!phonebookentry) {
+				return response.status(404).end()
+			}
+
+			phonebookentry.name = name
+			phonebookentry.number = number
+
+			return phonebookentry.save().then((updatedPhonebookentry) => {
+				response.json(updatedPhonebookentry)
+			})
+		})
+		.catch(error => next(error))
 })
 
 const unknownEndpoint = (request, response) => {
@@ -71,6 +108,19 @@ const unknownEndpoint = (request, response) => {
 }
 
 app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+	console.error(error.message)
+
+	if (error.name === 'CastError') {
+		return response.status(400).send({ error: 'malformatted id' })
+	}
+
+	next(error)
+}
+
+app.use(errorHandler)
+
 const PORT = process.env.PORT
 app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`)
